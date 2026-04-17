@@ -2,6 +2,17 @@ import Redis from 'ioredis';
 import { StorageProvider } from './StorageProvider';
 import { RateLimitResult } from '../types';
 
+declare module 'ioredis' {
+  interface Redis {
+    consumeTokenBucket(
+      key: string,
+      capacity: number,
+      fillRate: number,
+      amount: number
+    ): Promise<[number, number, number]>;
+  }
+}
+
 const LUA_SCRIPT = `
   local key = KEYS[1]
   local capacity = tonumber(ARGV[1])
@@ -46,7 +57,7 @@ export class RedisStorage implements StorageProvider {
   }
 
   async consume(key: string, amount: number, capacity: number, fillRate: number): Promise<RateLimitResult> {
-    const [allowed, remaining, resetInMs] = await (this.redis as any).consumeTokenBucket(
+    const [allowed, remaining, resetInMs] = await this.redis.consumeTokenBucket(
       key,
       capacity,
       fillRate,
