@@ -44,6 +44,48 @@ async function handleRequest(userId: string) {
 }
 ```
 
+## Framework Integrations
+
+The library provides built-in support for major Node.js frameworks. These are decoupled from the core to maintain a small footprint.
+
+### Express
+
+```typescript
+import { createExpressMiddleware } from './src/middleware/express';
+
+const limiter = new TokenBucket({ capacity: 100, refillAmount: 1, refillIntervalMs: 1000, storage });
+
+app.use(createExpressMiddleware(limiter, {
+  // Optional: identify users by API key instead of IP
+  keyGenerator: (req) => req.headers['x-api-key']
+}));
+```
+
+### NestJS
+
+```typescript
+// In your module providers
+{
+  provide: 'RATE_LIMIT_BUCKET',
+  useValue: new TokenBucket({ ... })
+}
+
+// In your controller or globally
+@UseGuards(RateLimitGuard)
+export class AppController { ... }
+```
+
+### Next.js (Edge Middleware)
+
+```typescript
+// middleware.ts
+import { nextRateLimit } from './src/middleware/next';
+
+export async function middleware(req: NextRequest) {
+  return await nextRateLimit(req, bucket);
+}
+```
+
 ## Configuration Options
 
 | Option | Type | Description |

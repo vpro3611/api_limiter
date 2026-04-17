@@ -48,7 +48,33 @@ The Lua script is the engine of the `RedisStorage` provider. It performs the fol
     - `FAIL_CLOSED`: On storage error (e.g., Redis down), `consume()` returns `allowed: false`. This protects your downstream services from being overwhelmed during a cache outage.
     - `FAIL_OPEN`: On storage error, `consume()` returns `allowed: true`. This prioritizes user experience, allowing traffic to pass even if the rate limiter is unavailable.
 
+## Framework Middleware Integrations
+
+The library provides optional integrations for Express, NestJS, and Next.js. These are designed with three core principles:
+
+1.  **Zero Runtime Dependency Overhead**: Framework-specific code is isolated in separate files. If a user only needs the core library, their project remains dependency-free of other frameworks.
+2.  **Standard Headers**: All integrations automatically handle standard rate-limiting headers:
+    - `X-RateLimit-Limit`: Maximum tokens.
+    - `X-RateLimit-Remaining`: Current tokens after consumption.
+    - `Retry-After`: Seconds until the request can be retried (on 429).
+3.  **Extensibility**: Users can provide a `keyGenerator` to identify requests (e.g., via API keys, User IDs, or custom headers) instead of the default IP address.
+
+### Express
+- Implemented as a standard middleware factory.
+- Correctly handles `async` custom handlers by awaiting their execution to prevent unhandled promise rejections.
+
+### NestJS
+- Implemented as a `CanActivate` Guard.
+- Designed for Dependency Injection; expects a `TokenBucket` to be provided with the token `'RATE_LIMIT_BUCKET'`.
+- Uses `@Optional()` and `@Inject('RATE_LIMIT_OPTIONS')` to allow flexible configuration of middleware options.
+
+### Next.js
+- Compatible with Edge Middleware and API routes.
+- Returns `NextResponse` with correct status codes and headers.
+- Handles IP extraction safely even in complex Edge environments.
+
 ## Performance Considerations
+...
 
 - **Single Round Trip**: By using Lua, we avoid multiple network calls (GET -> Calculate -> SET). One call to `consume()` results in one network round trip.
 - **Memory Efficiency**: Use of Redis Hashes and TTLs keeps the memory footprint low even with millions of unique keys.
