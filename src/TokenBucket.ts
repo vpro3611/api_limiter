@@ -6,7 +6,7 @@ export interface TokenBucketOptions extends BucketOptions {
 }
 
 export class TokenBucket {
-  constructor(private readonly options: TokenBucketOptions) {
+  constructor(public readonly options: TokenBucketOptions) {
     if (options.capacity <= 0) throw new Error('Capacity must be positive');
     if (options.refillAmount <= 0) throw new Error('Refill amount must be positive');
     if (options.refillIntervalMs <= 0) throw new Error('Refill interval must be positive');

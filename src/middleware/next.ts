@@ -7,13 +7,14 @@ export async function nextRateLimit(
   bucket: TokenBucket, 
   options: BaseMiddlewareOptions = {}
 ) {
-
+  const reqAny = req as any;
   const key = options.keyGenerator 
     ? await options.keyGenerator(req) 
-    : (req.ip || 'anonymous');
+    : (reqAny.ip || req.headers.get('x-forwarded-for') || 'anonymous');
     
   const result = await bucket.consume(key);
 
+  // Set standard headers on the response
   const res = NextResponse.next();
   res.headers.set('X-RateLimit-Limit', bucket.options.capacity.toString());
   res.headers.set('X-RateLimit-Remaining', result.remaining.toString());
