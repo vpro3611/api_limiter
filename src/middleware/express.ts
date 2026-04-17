@@ -1,8 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import { TokenBucket } from '../TokenBucket';
-import { MiddlewareOptions } from './types';
+import { ExpressMiddlewareOptions } from './types';
 
-export function createExpressMiddleware(bucket: TokenBucket, options: MiddlewareOptions = {}) {
+export function createExpressMiddleware(bucket: TokenBucket, options: ExpressMiddlewareOptions = {}) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const key = options.keyGenerator 
@@ -18,7 +18,8 @@ export function createExpressMiddleware(bucket: TokenBucket, options: Middleware
         res.setHeader('Retry-After', Math.ceil(result.resetInMs / 1000));
         
         if (options.handler) {
-          return options.handler(req, res, next);
+          await options.handler(req, res, next);
+          return;
         }
         return res.status(429).send('Too Many Requests');
       }

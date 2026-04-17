@@ -1,12 +1,12 @@
-import { CanActivate, ExecutionContext, Injectable, Inject, HttpException, HttpStatus } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Inject, Optional, HttpException, HttpStatus } from '@nestjs/common';
 import { TokenBucket } from '../TokenBucket';
-import { MiddlewareOptions } from './types';
+import { BaseMiddlewareOptions } from './types';
 
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   constructor(
     @Inject('RATE_LIMIT_BUCKET') private bucket: TokenBucket,
-    private options: MiddlewareOptions = {}
+    @Optional() @Inject('RATE_LIMIT_OPTIONS') private options: BaseMiddlewareOptions = {}
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TokenBucket } from '../TokenBucket';
-import { MiddlewareOptions } from './types';
+import { BaseMiddlewareOptions } from './types';
 
 export async function nextRateLimit(
   req: NextRequest, 
   bucket: TokenBucket, 
-  options: MiddlewareOptions = {}
+  options: BaseMiddlewareOptions = {}
 ) {
+
   const key = options.keyGenerator 
     ? await options.keyGenerator(req) 
     : (req.ip || 'anonymous');
