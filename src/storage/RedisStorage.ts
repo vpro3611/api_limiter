@@ -55,7 +55,6 @@ export class RedisStorage implements StorageProvider {
       lua: LUA_SCRIPT,
     });
   }
-
   async consume(key: string, amount: number, capacity: number, fillRate: number): Promise<RateLimitResult> {
     const [allowed, remaining, resetInMs] = await this.redis.consumeTokenBucket(
       key,
