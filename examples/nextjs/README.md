@@ -1,19 +1,22 @@
-# Next.js Edge Middleware Example (Redis)
+# Next.js Route Handler Example (Redis)
 
-This example demonstrates how to implement distributed rate limiting for **Next.js** API routes using Edge Middleware and the built-in **RedisStorage**.
+This example demonstrates how to implement distributed rate limiting for **Next.js** using **API Routes (Route Handlers)** and the built-in **RedisStorage**.
+
+## Why Route Handlers instead of Middleware?
+While Middleware is great for global checks, it runs in the **Edge Runtime**, which has limited support for TCP connections (like standard Redis). 
+
+By using **Route Handlers** (Pages or App Router):
+-   You use the full **Node.js runtime**.
+-   `ioredis` works out of the box.
+-   Singletons are stable and connections are pooled efficiently.
 
 ## What it demonstrates
--   **middleware.ts Integration**: Shows how to use the `nextRateLimit` utility.
--   **Atomic Redis Storage**: Uses Redis to persist rate-limit state across Edge nodes and reloads.
--   **Edge Runtime Compatibility**: Demonstrates a pattern for managing Redis connections in a serverless/edge environment.
--   **Path Matching**: Specifically targets `/api/*` routes.
+-   **Shared Utility Pattern**: A `lib/limiter.ts` file that manages the singleton instance.
+-   **Atomic Redis Storage**: Using the built-in provider to persist state.
+-   **Manual API Integration**: Demonstrates how to use the core `TokenBucket` API directly inside a handler.
 
 ## Prerequisites
 -   A **Redis server** must be running on `localhost:6379`.
--   You can start one easily with Docker:
-    ```bash
-    docker run --name redis -p 6379:6379 -d redis
-    ```
 
 ## How to run
 
@@ -36,4 +39,4 @@ This example demonstrates how to implement distributed rate limiting for **Next.
 
 4.  **Test it**:
     Refresh `http://localhost:3000/api/hello` multiple times.
-    Check your terminal logs to see the `[RateLimit]` output and remaining token count.
+    You will see the `X-RateLimit-*` headers in the response and a `429` error when the limit is reached.
