@@ -1,57 +1,44 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import Redis from 'ioredis';
 import { nextRateLimit } from 'api_limiter/dist/middleware/next';
-import { TokenBucket, StorageProvider, RateLimitResult } from 'api_limiter';
-
-// --- A real In-Memory Storage implementation ---
-class MemoryStorage implements StorageProvider {
-  private buckets = new Map<string, { tokens: number; lastRefill: number }>();
-
-  async consume(key: string, amount: number, capacity: number, fillRate: number): Promise<RateLimitResult> {
-    const now = Date.now();
-    const bucket = this.buckets.get(key) || { tokens: capacity, lastRefill: now };
-    const elapsed = now - bucket.lastRefill;
-    const currentTokens = Math.min(capacity, bucket.tokens + (elapsed * fillRate));
-
-    let allowed = false;
-    let newTokens = currentTokens;
-    if (currentTokens >= amount) {
-      newTokens = currentTokens - amount;
-      allowed = true;
-    }
-
-    this.buckets.set(key, { tokens: newTokens, lastRefill: now });
-    return {
-      allowed,
-      remaining: Math.floor(newTokens),
-      resetInMs: Math.ceil((capacity - newTokens) / fillRate),
-    };
-  }
-}
+import { TokenBucket, RedisStorage } from 'api_limiter';
 
 /**
- * In Next.js dev mode, the middleware is often re-initialized.
- * We use globalThis to persist the bucket state across requests in local development.
+ * Singleton pattern for Redis and TokenBucket to ensure consistency
+ * and efficient connection pooling in the Next.js Edge Runtime.
  */
-const getBucket = () => {
+const getRateLimiter = () => {
   const globalAny = globalThis as any;
+
   if (!globalAny._rateLimitBucket) {
+    // 1. Initialize Redis client
+    // In production, you would use an environment variable: process.env.REDIS_URL
+    const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      maxRetriesPerRequest: null,
+    });
+
+    // 2. Initialize storage and bucket
+    const storage = new RedisStorage(redis);
     globalAny._rateLimitBucket = new TokenBucket({
-      capacity: 3,
-      refillAmount: 1,
-      refillIntervalMs: 5000,
-      storage: new MemoryStorage(),
+      capacity: 5,           // Allow 5 requests
+      refillAmount: 1,       // Refill 1 token
+      refillIntervalMs: 2000, // Every 2 seconds
+      storage,
     });
   }
+
   return globalAny._rateLimitBucket;
 };
 
 export async function middleware(req: NextRequest) {
+  // Only apply rate limiting to /api routes
   if (req.nextUrl.pathname.startsWith('/api')) {
-    const bucket = getBucket();
+    const bucket = getRateLimiter();
     const res = await nextRateLimit(req, bucket);
     
-    // Log headers to help verify it's working
-    console.log(`[RateLimit] ${req.nextUrl.pathname} | Remaining: ${res.headers.get('X-RateLimit-Remaining')}`);
+    // Log for debugging visibility
+    const remaining = res.headers.get('X-RateLimit-Remaining');
+    console.log(`[RateLimit] ${req.nextUrl.pathname} | Remaining: ${remaining}`);
     
     return res;
   }

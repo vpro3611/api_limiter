@@ -318,17 +318,28 @@ class MemoryStorage {
         };
     }
 }
-const storage = new MemoryStorage();
-const bucket = new __TURBOPACK__imported__module__$5b$project$5d2f$dist$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["TokenBucket"]({
-    capacity: 3,
-    refillAmount: 1,
-    refillIntervalMs: 5000,
-    storage
-});
+/**
+ * In Next.js dev mode, the middleware is often re-initialized.
+ * We use globalThis to persist the bucket state across requests in local development.
+ */ const getBucket = ()=>{
+    const globalAny = globalThis;
+    if (!globalAny._rateLimitBucket) {
+        globalAny._rateLimitBucket = new __TURBOPACK__imported__module__$5b$project$5d2f$dist$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["TokenBucket"]({
+            capacity: 3,
+            refillAmount: 1,
+            refillIntervalMs: 5000,
+            storage: new MemoryStorage()
+        });
+    }
+    return globalAny._rateLimitBucket;
+};
 async function middleware(req) {
-    // Only rate limit API routes
     if (req.nextUrl.pathname.startsWith('/api')) {
-        return await (0, __TURBOPACK__imported__module__$5b$project$5d2f$dist$2f$middleware$2f$next$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["nextRateLimit"])(req, bucket);
+        const bucket = getBucket();
+        const res = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$dist$2f$middleware$2f$next$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["nextRateLimit"])(req, bucket);
+        // Log headers to help verify it's working
+        console.log(`[RateLimit] ${req.nextUrl.pathname} | Remaining: ${res.headers.get('X-RateLimit-Remaining')}`);
+        return res;
     }
 }
 const config = {

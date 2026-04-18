@@ -1,24 +1,19 @@
-# Next.js Edge Middleware Example
+# Next.js Edge Middleware Example (Redis)
 
-This example demonstrates how to implement global rate limiting for **Next.js** API routes using Edge Middleware.
+This example demonstrates how to implement distributed rate limiting for **Next.js** API routes using Edge Middleware and the built-in **RedisStorage**.
 
 ## What it demonstrates
 -   **middleware.ts Integration**: Shows how to use the `nextRateLimit` utility.
--   **Edge Runtime Compatibility**: Demonstrates the library's ability to run in the restricted Edge environment.
--   **Path Matching**: Shows how to apply rate limiting only to specific paths (e.g., `/api/*`).
--   **NextResponse Manipulation**: Handling headers and status codes in the Next.js way.
+-   **Atomic Redis Storage**: Uses Redis to persist rate-limit state across Edge nodes and reloads.
+-   **Edge Runtime Compatibility**: Demonstrates a pattern for managing Redis connections in a serverless/edge environment.
+-   **Path Matching**: Specifically targets `/api/*` routes.
 
-## ⚠️ Important Note: Edge Runtime Statelessness
-
-Next.js Middleware runs in the **Edge Runtime**, which is designed to be lightweight and stateless. In development (`next dev`), the middleware environment may be re-initialized frequently, causing an in-memory `Map` to reset.
-
-### For Real-World Usage:
-It is **strongly recommended** to use the built-in `RedisStorage` for Next.js Middleware. Since the Edge Runtime is distributed, an in-memory storage will only rate-limit requests hitting the specific edge node or process, which is not accurate.
-
-To use Redis in Next.js:
-1.  Install `ioredis`.
-2.  Initialize `RedisStorage` with a connection to a distributed Redis (like Upstash).
-3.  Pass the storage to your `TokenBucket`.
+## Prerequisites
+-   A **Redis server** must be running on `localhost:6379`.
+-   You can start one easily with Docker:
+    ```bash
+    docker run --name redis -p 6379:6379 -d redis
+    ```
 
 ## How to run
 
@@ -41,3 +36,4 @@ To use Redis in Next.js:
 
 4.  **Test it**:
     Refresh `http://localhost:3000/api/hello` multiple times.
+    Check your terminal logs to see the `[RateLimit]` output and remaining token count.
