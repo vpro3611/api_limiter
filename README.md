@@ -8,7 +8,17 @@ A generic, high-performance **Token Bucket** rate limiter for Node.js. Built for
 -   **Clock Drift Safe**: Does **not** trust your application server's clock. It uses the storage-side time (e.g., Redis `TIME`) as the source of truth for refills.
 -   **Pluggable Backend**: Use the built-in Redis provider or implement your own (PostgreSQL, MongoDB, etc.) with a single interface.
 -   **Fail-Safe Strategies**: Configurable `FAIL_OPEN` or `FAIL_CLOSED` behavior when your storage backend goes offline.
--   **Framework Friendly**: Built-in, zero-dependency middleware for **Express**, **NestJS**, and **Next.js**.
+- **Framework Friendly**: Built-in, zero-dependency middleware for **Express**, **NestJS**, and **Next.js**.
+
+## ⚙️ Runtime Compatibility
+
+Currently, this library is optimized for the **Node.js Runtime** (using TCP-based storage like `ioredis`). 
+
+| Environment | Context | Supported? | Reason |
+| :--- | :--- | :--- | :--- |
+| **Node.js** | Express / NestJS / Fastify | ✅ **Yes** | Full TCP support |
+| **Next.js** | Route Handlers (API) | ✅ **Yes** | Full Node.js Runtime |
+| **Next.js** | Edge Middleware | ❌ **Planned** | Edge Runtime requires HTTP-based storage |
 
 ---
 

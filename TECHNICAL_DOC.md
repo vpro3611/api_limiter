@@ -73,6 +73,17 @@ The library provides optional integrations for Express, NestJS, and Next.js. The
 - Returns `NextResponse` with correct status codes and headers.
 - Handles IP extraction safely even in complex Edge environments.
 
+## Runtime Compatibility
+
+| Environment | Context | Supported? | Reason |
+| :--- | :--- | :--- | :--- |
+| **Node.js** | Express / NestJS / Fastify | ✅ **Yes** | Full TCP support |
+| **Next.js** | Route Handlers (API) | ✅ **Yes** | Full Node.js Runtime |
+| **Next.js** | Edge Middleware | ❌ **Planned** | Edge Runtime requires HTTP-based storage |
+
+### Note on Edge Runtime (Next.js Middleware)
+Standard Redis clients like `ioredis` rely on TCP sockets, which are not supported in the restricted Next.js Edge Runtime. To support `middleware.ts` in the future, a `UniversalRedisStorage` using HTTP-based Redis (like Upstash) is planned.
+
 ## Performance Considerations
 ...
 

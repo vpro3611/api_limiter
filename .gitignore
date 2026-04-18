@@ -1,3 +1,4 @@
+examples/**/.next/
 node_modules/
 dist/
 *.log
