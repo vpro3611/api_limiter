@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { nextRateLimit } from 'api_limiter/dist/middleware/next';
 import { TokenBucket, StorageProvider, RateLimitResult } from 'api_limiter';
 
@@ -28,18 +28,32 @@ class MemoryStorage implements StorageProvider {
   }
 }
 
-const storage = new MemoryStorage();
-const bucket = new TokenBucket({
-  capacity: 3,
-  refillAmount: 1,
-  refillIntervalMs: 5000,
-  storage,
-});
+/**
+ * In Next.js dev mode, the middleware is often re-initialized.
+ * We use globalThis to persist the bucket state across requests in local development.
+ */
+const getBucket = () => {
+  const globalAny = globalThis as any;
+  if (!globalAny._rateLimitBucket) {
+    globalAny._rateLimitBucket = new TokenBucket({
+      capacity: 3,
+      refillAmount: 1,
+      refillIntervalMs: 5000,
+      storage: new MemoryStorage(),
+    });
+  }
+  return globalAny._rateLimitBucket;
+};
 
 export async function middleware(req: NextRequest) {
-  // Only rate limit API routes
   if (req.nextUrl.pathname.startsWith('/api')) {
-    return await nextRateLimit(req, bucket);
+    const bucket = getBucket();
+    const res = await nextRateLimit(req, bucket);
+    
+    // Log headers to help verify it's working
+    console.log(`[RateLimit] ${req.nextUrl.pathname} | Remaining: ${res.headers.get('X-RateLimit-Remaining')}`);
+    
+    return res;
   }
 }
 
