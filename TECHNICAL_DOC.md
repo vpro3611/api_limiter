@@ -69,7 +69,8 @@ The library provides optional integrations for Express, NestJS, and Next.js. The
 - Uses `@Optional()` and `@Inject('RATE_LIMIT_OPTIONS')` to allow flexible configuration of middleware options.
 
 ### Next.js
-- Compatible with Edge Middleware and API routes.
+- **NOT compatible** with Edge Middleware (for now).
+- Compatible with API Route Handlers since it uses NODE.js runtime.
 - Returns `NextResponse` with correct status codes and headers.
 - Handles IP extraction safely even in complex Edge environments.
 
