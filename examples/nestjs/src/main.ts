@@ -8,4 +8,4 @@ async function bootstrap() {
   console.log(`🚀 NestJS Example listening at http://localhost:3001`);
   console.log('Try calling GET http://localhost:3001/api/data');
 }
-bootstrap();
+bootstrap().catch(console.error);
