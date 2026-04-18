@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 16, "column": 0}, "map": {"version":3,"sources":["file:///home/vpro3611/api_limiter/examples/nextjs/pages/api/hello.ts"],"sourcesContent":["import type { NextApiRequest, NextApiResponse } from 'next';\n\nexport default function handler(req: NextApiRequest, res: NextApiResponse) {\n  res.status(200).json({ \n    message: 'Success! You accessed the Next.js API route.',\n    note: 'The rate limit was enforced by the middleware.ts file.'\n  });\n}\n"],"names":["handler","req","res","status","json","message","note"],"mappings":";;;;AAEe,SAASA,QAAQC,GAAmB,EAAEC,GAAoB;IACvEA,IAAIC,MAAM,CAAC,KAAKC,IAAI,CAAC;QACnBC,SAAS;QACTC,MAAM;IACR;AACF"}}]
-}
