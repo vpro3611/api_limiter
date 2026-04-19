@@ -1,24 +1,24 @@
 # Atomic Rate Limiter 🚀
 
-A generic, high-performance **Token Bucket** rate limiter for Node.js. Built for distributed systems where atomicity, reliability, and framework-agnosticism are critical.
+A generic, high-performance **Token Bucket** rate limiter for Node.js and Edge environments. Built for distributed systems where atomicity, reliability, and framework-agnosticism are critical.
 
 ## 🌟 Why choose this?
 
 -   **Distributed Correctness**: Uses Lua scripts in Redis to ensure all operations are atomic across multiple app servers. No race conditions.
 -   **Clock Drift Safe**: Does **not** trust your application server's clock. It uses the storage-side time (e.g., Redis `TIME`) as the source of truth for refills.
--   **Pluggable Backend**: Use the built-in Redis provider or implement your own (PostgreSQL, MongoDB, etc.) with a single interface.
+-   **Pluggable Backend**: Use the built-in Redis provider (TCP), the Upstash provider (HTTP/Edge), or implement your own.
 -   **Fail-Safe Strategies**: Configurable `FAIL_OPEN` or `FAIL_CLOSED` behavior when your storage backend goes offline.
 - **Framework Friendly**: Built-in, zero-dependency middleware for **Express**, **NestJS**, and **Next.js**.
 
 ## ⚙️ Runtime Compatibility
 
-Currently, this library is optimized for the **Node.js Runtime** (using TCP-based storage like `ioredis`). 
+This library is fully compatible with both **Node.js** and **Edge Runtime** (e.g., Next.js Middleware, Cloudflare Workers).
 
-| Environment | Context | Supported? | Reason |
+| Environment | Context | Supported? | Recommended Storage |
 | :--- | :--- | :--- | :--- |
-| **Node.js** | Express / NestJS / Fastify | ✅ **Yes** | Full TCP support |
-| **Next.js** | Route Handlers (API) | ✅ **Yes** | Full Node.js Runtime |
-| **Next.js** | Edge Middleware | ❌ **Planned** | Edge Runtime requires HTTP-based storage |
+| **Node.js** | Express / NestJS / Fastify | ✅ **Yes** | `RedisStorage` (TCP) |
+| **Next.js** | Route Handlers (API) | ✅ **Yes** | `RedisStorage` (TCP) |
+| **Next.js** | Edge Middleware | ✅ **Yes** | `UpstashRedisStorage` (HTTP) |
 
 ---
 
@@ -30,105 +30,76 @@ npm install ioredis
 
 ---
 
-## 🚀 Quick Start (Redis)
+## 🚀 Quick Start
 
-Set up a rate limiter that allows **10 requests per minute** with burst support.
+### For Node.js (Standard Redis via TCP)
 
 ```typescript
 import Redis from 'ioredis';
-import { TokenBucket, RedisStorage } from './api_limiter';
+import { TokenBucket, RedisStorage } from 'api_limiter';
 
-// 1. Initialize storage
 const redis = new Redis();
 const storage = new RedisStorage(redis);
 
-// 2. Configure the bucket
 const limiter = new TokenBucket({
-  capacity: 10,           // Max burst size
-  refillAmount: 10,       // How many tokens are added
-  refillIntervalMs: 60000, // Every 1 minute
+  capacity: 10,
+  refillAmount: 10,
+  refillIntervalMs: 60000,
   storage,
-  failStrategy: 'FAIL_CLOSED' // Deny requests if Redis is down
+});
+```
+
+### For Edge Runtime (Upstash Redis via HTTP)
+
+Perfect for **Next.js Middleware** or Vercel Edge Functions where TCP is not available.
+
+```typescript
+import { TokenBucket, UpstashRedisStorage } from 'api_limiter';
+
+const storage = new UpstashRedisStorage({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// 3. Consume tokens
-async function apiAction(userId: string) {
-  const result = await limiter.consume(userId);
-
-  if (result.allowed) {
-    console.log(`Success! Remaining: ${result.remaining}`);
-  } else {
-    console.log(`Rate limited! Retry after ${result.resetInMs}ms`);
-  }
-}
+const limiter = new TokenBucket({
+  capacity: 10,
+  refillAmount: 10,
+  refillIntervalMs: 60000,
+  storage,
+});
 ```
 
 ---
 
 ## 🛠 Framework Integrations
 
-The library provides optional, lightweight integrations for major frameworks.
-
 ### Express Middleware
 ```typescript
 import { createExpressMiddleware } from 'api_limiter/express';
 
-const bucket = new TokenBucket({ ... });
-
 app.use(createExpressMiddleware(bucket, {
-  // Use API key instead of IP for identification
-  keyGenerator: (req) => req.headers['x-api-key'] || req.ip,
-  // Custom action on rate limit
-  handler: (req, res) => res.status(429).json({ error: 'Chill out!' })
+  keyGenerator: (req) => req.ip,
+  handler: (req, res) => res.status(429).json({ error: 'Too many requests' })
 }));
 ```
 
 ### NestJS Guard
 ```typescript
-// app.module.ts
-@Module({
-  providers: [
-    { provide: 'RATE_LIMIT_BUCKET', useValue: new TokenBucket({ ... }) },
-    RateLimitGuard
-  ]
-})
-
-// controller.ts
+// Use the built-in RateLimitGuard with Dependency Injection
 @UseGuards(RateLimitGuard)
-@Get('secure-data')
+@Get('data')
 getData() { ... }
 ```
 
-### Next.js (Edge Middleware)
+### Next.js (Middleware & Route Handlers)
 ```typescript
-// middleware.ts
+// middleware.ts (Edge Runtime)
 import { nextRateLimit } from 'api_limiter/next';
 
 export async function middleware(req: NextRequest) {
-  return await nextRateLimit(req, bucket);
+  return await nextRateLimit(req, edgeLimiter);
 }
 ```
-
----
-
-## 📖 API Reference
-
-### `TokenBucket`
-
-#### `new TokenBucket(options)`
-- `capacity`: Maximum tokens in the bucket.
-- `refillAmount`: Number of tokens added per interval.
-- `refillIntervalMs`: Interval duration in ms.
-- `storage`: A class implementing `StorageProvider`.
-- `failStrategy`: `'FAIL_OPEN'` (allow on error) or `'FAIL_CLOSED'` (deny on error).
-
-#### `consume(key: string, amount: number = 1): Promise<RateLimitResult>`
-Consumes the specified amount of tokens for the given key.
-
-**Returns `RateLimitResult`:**
-- `allowed: boolean`: Whether the request should proceed.
-- `remaining: number`: How many tokens are left in the bucket.
-- `resetInMs: number`: How long until the bucket is full again.
 
 ---
 
@@ -136,43 +107,8 @@ Consumes the specified amount of tokens for the given key.
 
 Distributed systems fail. This library lets you decide how to handle it:
 
--   **`FAIL_CLOSED` (Default)**: If Redis is down, all `consume()` calls return `allowed: false`. Best for protecting your database from massive spikes during a cache failure.
--   **`FAIL_OPEN`**: If Redis is down, all calls return `allowed: true`. Best for prioritizing user experience when rate limiting is a "nice-to-have".
-
-```typescript
-const limiter = new TokenBucket({
-  // ...
-  failStrategy: 'FAIL_OPEN' 
-});
-```
-
----
-
-## 🔌 Custom Storage Provider
-
-Building a custom provider (e.g., for PostgreSQL) is simple. Just implement the `StorageProvider` interface:
-
-```typescript
-import { StorageProvider, RateLimitResult } from 'api_limiter';
-
-class PostgresStorage implements StorageProvider {
-  async consume(key: string, amount: number, capacity: number, fillRate: number): Promise<RateLimitResult> {
-    // 1. Run an atomic SQL transaction
-    // 2. Refill based on DB time
-    // 3. Check if tokens >= amount
-    // 4. Update and return results
-  }
-}
-```
-
----
-
-## 📈 Performance Tip: Choosing Capacity & Refill
-
-The **Token Bucket** algorithm is great because it handles **bursts**.
-
--   **Low Burst**: `capacity: 5`, `refillAmount: 5`, `refillIntervalMs: 60000` (Strict 5 reqs/min).
--   **High Burst**: `capacity: 50`, `refillAmount: 5`, `refillIntervalMs: 60000` (Allows 50 reqs at once, then refills slowly).
+-   **`FAIL_CLOSED` (Default)**: If Redis is down, all calls return `allowed: false`. Protects your system from overload.
+-   **`FAIL_OPEN`**: If Redis is down, all calls return `allowed: true`. Prioritizes user experience.
 
 ---
 

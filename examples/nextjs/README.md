@@ -1,22 +1,20 @@
-# Next.js Route Handler Example (Redis)
+# Next.js Rate Limiting Example
 
-This example demonstrates how to implement distributed rate limiting for **Next.js** using **API Routes (Route Handlers)** and the built-in **RedisStorage**.
+This example demonstrates two ways to implement rate limiting in a Next.js application, depending on the environment and runtime.
 
-## Why Route Handlers instead of Middleware?
-While Middleware is great for global checks, it runs in the **Edge Runtime**, which has limited support for TCP connections (like standard Redis). 
+## 1. Route Handlers (Node.js Runtime) - Recommended for TCP Redis
+This is the standard approach using the **Node.js runtime**. It works with traditional Redis clients like `ioredis`.
 
-By using **Route Handlers** (Pages or App Router):
--   You use the full **Node.js runtime**.
--   `ioredis` works out of the box.
--   Singletons are stable and connections are pooled efficiently.
+-   **File**: `src/pages/api/hello.ts` (or `app/api/hello/route.ts`)
+-   **Storage**: `RedisStorage` (uses TCP)
+-   **Implementation**: Manual integration in the handler using `limiter.consume()`.
 
-## What it demonstrates
--   **Shared Utility Pattern**: A `lib/limiter.ts` file that manages the singleton instance.
--   **Atomic Redis Storage**: Using the built-in provider to persist state.
--   **Manual API Integration**: Demonstrates how to use the core `TokenBucket` API directly inside a handler.
+## 2. Middleware (Edge Runtime) - Recommended for Global Protection
+Next.js Middleware runs in the **Edge Runtime**, which doesn't support TCP. For this, we use the `UpstashRedisStorage` which communicates via HTTP.
 
-## Prerequisites
--   A **Redis server** must be running on `localhost:6379`.
+-   **File**: `middleware.ts`
+-   **Storage**: `UpstashRedisStorage` (uses `fetch`)
+-   **Implementation**: Using the `nextRateLimit` helper.
 
 ## How to run
 
@@ -32,11 +30,22 @@ By using **Route Handlers** (Pages or App Router):
     npm install
     ```
 
-3.  **Start the development server**:
+3.  **Setup Environment Variables**:
+    For the Node.js/TCP example:
+    ```bash
+    REDIS_URL=redis://localhost:6379
+    ```
+    For the Edge/Middleware example (requires an [Upstash](https://upstash.com) account):
+    ```bash
+    UPSTASH_REDIS_REST_URL=https://...
+    UPSTASH_REDIS_REST_TOKEN=...
+    ```
+
+4.  **Start the development server**:
     ```bash
     npm run dev
     ```
 
-4.  **Test it**:
-    Refresh `http://localhost:3000/api/hello` multiple times.
-    You will see the `X-RateLimit-*` headers in the response and a `429` error when the limit is reached.
+5.  **Test it**:
+    -   **Route Handler**: Refresh `http://localhost:3000/api/hello`
+    -   **Middleware**: Refresh `http://localhost:3000/` (limits root access)
