@@ -2,80 +2,60 @@
 
 ## Architecture Overview
 
-The library follows a **Delegated Atomic Logic** pattern. Instead of the application server calculating token counts (which leads to race conditions in distributed systems), the logic is moved as close to the data as possible.
+The library follows a **Delegated Atomic Logic** pattern. Instead of calculating token counts on the application server (which leads to race conditions), the rate-limiting logic is executed atomically within the storage layer using Lua scripts.
 
 ### Core Components
 
 1.  **TokenBucket (Orchestrator)**:
-    - Validates configuration on initialization.
-    - Calculates the `fillRate` (tokens per millisecond).
+    - Validates configuration and calculates the `fillRate`.
     - Handles failure strategies (`FAIL_OPEN` / `FAIL_CLOSED`).
-    - Acts as the primary entry point for the consumer.
+    - Acts as the primary entry point for developers.
 
 2.  **StorageProvider (Interface)**:
-    - Decouples the algorithm from the database.
     - Defines a single `consume` method that must be implemented atomically by the provider.
 
-3.  **RedisStorage (Implementation)**:
-    - Implements the `StorageProvider` using Redis.
-    - Uses a custom Lua script to perform all calculations in a single atomic step.
+3.  **RedisStorage (TCP)**:
+    - Implements the `StorageProvider` using the `ioredis` library.
+    - Uses a custom Lua script for atomic state updates.
 
-## The Token Bucket Algorithm
+4.  **UpstashRedisStorage (HTTP/Edge)**:
+    - Implements the `StorageProvider` using the standard `fetch` API.
+    - Designed specifically for the **Edge Runtime** (e.g., Next.js Middleware) where TCP is not supported.
+    - Interacts with the Upstash Redis REST API.
 
-We use a "Leaky Bucket as a Meter" variant (Token Bucket).
-- **Tokens** are added at a constant rate.
-- **Capacity** limits the maximum "burst" size.
-- **Consumption** happens immediately if enough tokens exist.
+## The Shared Token Bucket Algorithm
 
-### Formula
-`Current Tokens = min(Capacity, Last Tokens + (Current Time - Last Refill Time) * Fill Rate)`
+Both storage providers share the same core logic via `src/storage/lua.ts`. This ensures consistent behavior regardless of the transport layer.
 
-## Redis Lua Script Logic
+### Lua Script Logic
+The script performs the following steps inside Redis:
 
-The Lua script is the engine of the `RedisStorage` provider. It performs the following steps inside Redis:
-
-1.  **Time Sync**: Calls `redis.call('TIME')` to get the microsecond-accurate time from the Redis server. This ensures that even if application servers have different system clocks, the rate limit remains consistent.
+1.  **Time Sync**: Calls `redis.call('TIME')` to get the microsecond-accurate time from the Redis server.
 2.  **State Retrieval**: Fetches the current token count and the timestamp of the last refill from a Redis Hash.
-3.  **Refill Calculation**: Computes the tokens gained since the last interaction.
-4.  **Consumption Check**: If the resulting token count is greater than or equal to the requested `amount`, it decrements the count.
-5.  **Persistence**: Saves the new token count and the current timestamp back to the Hash.
-6.  **Automatic Cleanup**: Sets a TTL (Time To Live) on the key. The TTL is calculated as the time it would take to fully refill the bucket plus a safety buffer (60s), ensuring Redis memory is cleaned up for inactive keys.
+3.  **Refill Calculation**: Computes tokens gained since the last interaction based on the elapsed time.
+4.  **Consumption Check**: Decrements the count if enough tokens exist.
+5.  **Persistence**: Saves the new count and timestamp back to the Hash.
+6.  **Automatic Cleanup**: Sets a TTL on the key (calculated as the time to full refill + 60s buffer) to optimize Redis memory usage.
+
+## Runtime Compatibility
+
+### Node.js Runtime
+- Uses `RedisStorage` (TCP).
+- Ideal for long-running servers like Express or NestJS.
+- Persistent connections are pooled for maximum throughput.
+
+### Edge Runtime (Next.js Middleware)
+- Uses `UpstashRedisStorage` (HTTP).
+- Leverages the `fetch` API which is native to the Edge environment.
+- Bypasses TCP limitations of serverless environments.
 
 ## Error Handling & Failure Strategies
 
-- **Input Validation**: The constructor throws errors for non-positive values to prevent division by zero or infinite refill loops in the storage layer.
-- **Fail Strategy**:
-    - `FAIL_CLOSED`: On storage error (e.g., Redis down), `consume()` returns `allowed: false`. This protects your downstream services from being overwhelmed during a cache outage.
-    - `FAIL_OPEN`: On storage error, `consume()` returns `allowed: true`. This prioritizes user experience, allowing traffic to pass even if the rate limiter is unavailable.
-
-## Framework Middleware Integrations
-
-The library provides optional integrations for Express, NestJS, and Next.js. These are designed with three core principles:
-
-1.  **Zero Runtime Dependency Overhead**: Framework-specific code is isolated in separate files. If a user only needs the core library, their project remains dependency-free of other frameworks.
-2.  **Standard Headers**: All integrations automatically handle standard rate-limiting headers:
-    - `X-RateLimit-Limit`: Maximum tokens.
-    - `X-RateLimit-Remaining`: Current tokens after consumption.
-    - `Retry-After`: Seconds until the request can be retried (on 429).
-3.  **Extensibility**: Users can provide a `keyGenerator` to identify requests (e.g., via API keys, User IDs, or custom headers) instead of the default IP address.
-
-### Express
-- Implemented as a standard middleware factory.
-- Correctly handles `async` custom handlers by awaiting their execution to prevent unhandled promise rejections.
-
-### NestJS
-- Implemented as a `CanActivate` Guard.
-- Designed for Dependency Injection; expects a `TokenBucket` to be provided with the token `'RATE_LIMIT_BUCKET'`.
-- Uses `@Optional()` and `@Inject('RATE_LIMIT_OPTIONS')` to allow flexible configuration of middleware options.
-
-### Next.js
-- Compatible with Edge Middleware and API routes.
-- Returns `NextResponse` with correct status codes and headers.
-- Handles IP extraction safely even in complex Edge environments.
+- **Input Validation**: The constructor throws errors for non-positive values.
+- **Fail-Open Strategy**: If configured as `FAIL_OPEN`, the `TokenBucket` will catch storage errors (network timeouts, Redis downtime) and allow the request to proceed, ensuring your application remains available during rate limiter outages.
+- **Fail-Closed Strategy**: The default behavior which denies requests if the storage layer fails, protecting downstream resources.
 
 ## Performance Considerations
-...
 
-- **Single Round Trip**: By using Lua, we avoid multiple network calls (GET -> Calculate -> SET). One call to `consume()` results in one network round trip.
-- **Memory Efficiency**: Use of Redis Hashes and TTLs keeps the memory footprint low even with millions of unique keys.
-- **Complexity**: O(1) time complexity for consumption checks.
+- **Atomicity**: No matter how many app instances are running, the rate limit is enforced globally without race conditions.
+- **Latency**: Lua scripts are extremely fast (sub-millisecond execution). `RedisStorage` (TCP) is generally faster than `UpstashRedisStorage` (HTTP) due to persistent connections, so TCP should be preferred in Node.js environments.
