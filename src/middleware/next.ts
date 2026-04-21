@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TokenBucket } from '../TokenBucket';
 import { BaseMiddlewareOptions } from './types';
 
+export { BaseMiddlewareOptions };
+
 export async function nextRateLimit(
   req: NextRequest, 
   bucket: TokenBucket, 

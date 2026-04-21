@@ -2,6 +2,8 @@ import { CanActivate, ExecutionContext, Injectable, Inject, Optional, HttpExcept
 import { TokenBucket } from '../TokenBucket';
 import { BaseMiddlewareOptions } from './types';
 
+export { BaseMiddlewareOptions };
+
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   constructor(
