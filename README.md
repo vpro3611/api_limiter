@@ -26,6 +26,7 @@ This library is fully compatible with both **Node.js** and **Edge Runtime** (e.g
 
 ```bash
 npm install ioredis
+npm i @vpro3611/req-shield
 ```
 
 ---
