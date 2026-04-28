@@ -1,19 +1,20 @@
 import { CanActivate, ExecutionContext, Injectable, Inject, Optional, HttpException, HttpStatus } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { TokenBucket } from '../TokenBucket';
 import { BaseMiddlewareOptions } from './types';
 
-export { BaseMiddlewareOptions };
+export type NestMiddlewareOptions = BaseMiddlewareOptions<Request>;
 
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   constructor(
     @Inject('RATE_LIMIT_BUCKET') private bucket: TokenBucket,
-    @Optional() @Inject('RATE_LIMIT_OPTIONS') private options: BaseMiddlewareOptions = {}
+    @Optional() @Inject('RATE_LIMIT_OPTIONS') private options: NestMiddlewareOptions = {}
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
     
     const key = this.options.keyGenerator 
       ? await this.options.keyGenerator(request) 
