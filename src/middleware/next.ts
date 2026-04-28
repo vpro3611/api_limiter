@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TokenBucket } from '../TokenBucket';
 import { BaseMiddlewareOptions } from './types';
 
-export { BaseMiddlewareOptions };
+export type NextMiddlewareOptions = BaseMiddlewareOptions<NextRequest>;
 
 export async function nextRateLimit(
-  req: NextRequest, 
-  bucket: TokenBucket, 
-  options: BaseMiddlewareOptions = {}
+  req: NextRequest,
+  bucket: TokenBucket,
+  options: NextMiddlewareOptions = {}
 ) {
-  const reqAny = req as any;
-  const key = options.keyGenerator 
-    ? await options.keyGenerator(req) 
-    : (reqAny.ip || req.headers.get('x-forwarded-for') || 'anonymous');
+  const key = options.keyGenerator
+    ? await options.keyGenerator(req)
+    : (req.headers.get('x-forwarded-for') || 'anonymous');
     
   const result = await bucket.consume(key);
 
