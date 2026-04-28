@@ -10,7 +10,7 @@ export async function middleware(req: NextRequest) {
   // Only apply rate limiting to the home page or specific routes
   if (req.nextUrl.pathname === '/') {
     return await nextRateLimit(req, edgeLimiter, {
-      keyGenerator: (req) => req.ip || 'anonymous-middleware',
+      keyGenerator: (req) => req.headers.get('x-forwarded-for') ?? 'anonymous-middleware',
     });
   }
 }

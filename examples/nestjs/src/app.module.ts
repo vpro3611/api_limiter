@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import type { Request } from 'express';
 import { AppController } from './app.controller';
 import { TokenBucket, StorageProvider, RateLimitResult } from 'api_limiter';
 
@@ -44,7 +45,7 @@ class MemoryStorage implements StorageProvider {
     {
       provide: 'RATE_LIMIT_OPTIONS',
       useValue: {
-        keyGenerator: (req: any) => req.ip || 'unknown',
+        keyGenerator: (req: Request) => req.ip ?? 'unknown',
       },
     },
   ],
