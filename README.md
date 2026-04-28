@@ -74,17 +74,25 @@ const limiter = new TokenBucket({
 ## 🛠 Framework Integrations
 
 ### Express Middleware
+
+`keyGenerator` receives a fully-typed Express `Request`. `handler` receives `Request`, `Response`, and optionally `NextFunction`.
+
 ```typescript
-import { createExpressMiddleware } from 'api_limiter/express';
+import { createExpressMiddleware, ExpressMiddlewareOptions } from 'api_limiter/express';
 
 app.use(createExpressMiddleware(bucket, {
-  keyGenerator: (req) => req.ip,
+  keyGenerator: (req) => req.ip ?? 'unknown',
   handler: (req, res) => res.status(429).json({ error: 'Too many requests' })
 }));
 ```
 
 ### NestJS Guard
+
+`keyGenerator` receives an Express `Request` (default Express adapter). Export type: `NestMiddlewareOptions`.
+
 ```typescript
+import { RateLimitGuard, NestMiddlewareOptions } from 'api_limiter/nestjs';
+
 // Use the built-in RateLimitGuard with Dependency Injection
 @UseGuards(RateLimitGuard)
 @Get('data')
@@ -92,12 +100,16 @@ getData() { ... }
 ```
 
 ### Next.js (Middleware & Route Handlers)
+
+`keyGenerator` receives a `NextRequest`. Use `x-forwarded-for` for IP — `NextRequest` does not expose `.ip` as a typed property. Export type: `NextMiddlewareOptions`.
+
 ```typescript
-// middleware.ts (Edge Runtime)
-import { nextRateLimit } from 'api_limiter/next';
+import { nextRateLimit, NextMiddlewareOptions } from 'api_limiter/next';
 
 export async function middleware(req: NextRequest) {
-  return await nextRateLimit(req, edgeLimiter);
+  return await nextRateLimit(req, edgeLimiter, {
+    keyGenerator: (req) => req.headers.get('x-forwarded-for') ?? 'anonymous',
+  });
 }
 ```
 
