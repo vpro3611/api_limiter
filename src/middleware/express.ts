@@ -1,8 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
 import { TokenBucket } from '../TokenBucket';
-import { ExpressMiddlewareOptions } from './types';
+import { BaseMiddlewareOptions } from './types';
 
-export { ExpressMiddlewareOptions };
+export interface ExpressMiddlewareOptions extends BaseMiddlewareOptions<Request> {
+  handler?: (req: Request, res: Response, next?: NextFunction) => void | Promise<void>;
+}
 
 export function createExpressMiddleware(bucket: TokenBucket, options: ExpressMiddlewareOptions = {}) {
   return async (req: Request, res: Response, next: NextFunction) => {
